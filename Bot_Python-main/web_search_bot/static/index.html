@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Extração de Coluna Excel para Array</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <header>
+        <h2 class="centered-title">Extração de Coluna do Excel e Busca por "Giramille"</h2>
+    </header>
+
+    <main>
+        <!-- Card 1: Upload + Botão -->
+        <section class="card">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" id="fileInput" name="file" accept=".xls, .xlsx" />
+                <button type="button" onclick="extractColumn()">Extrair e Processar</button>
+            </form>
+        </section>
+
+        <!-- Card 2: Status + Loading -->
+        <section class="card">
+            <p id="status"></p>
+            <div id="loadingIndicator" style="display:none;">
+                <div class="spinner"></div>
+                Processando sites... <span id="progressText"></span>
+            </div>
+            <pre id="output"></pre>
+        </section>
+
+        <!-- Card 3: Resultados da Busca -->
+        <section class="card" id="results">
+            <h3>Resultados da Busca</h3>
+            <table id="resultsTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>URL</th>
+                        <th>Status da Busca por Search</th>
+                        <th>Status da Busca por "Giramille"</th>
+                        <th>Progresso</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
