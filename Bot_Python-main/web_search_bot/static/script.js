@@ -192,3 +192,33 @@ function updateResultsTable(results) {
         resultsBody.appendChild(row);
     });
 }
+
+function generate_report() {
+    // Pega a tabela pelo ID
+    const table = document.getElementById("resultsTable");
+    if (!table || table.style.display === "none") {
+        alert("Nenhum resultado disponível para gerar o relatório.");
+        return;
+    }
+
+    // Converte a tabela HTML para uma planilha SheetJS
+    const worksheet = XLSX.utils.table_to_sheet(table);
+
+    // Cria o workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados");
+
+    const now = new Date();
+    const timestamp = now.getFullYear() + "-" +
+        String(now.getMonth() + 1).padStart(2, '0') + "-" +
+        String(now.getDate()).padStart(2, '0') + "_" +
+        String(now.getHours()).padStart(2, '0') + "-" +
+        String(now.getMinutes()).padStart(2, '0');
+
+    // Nome final do arquivo
+    const fileName = `relatorio_resultados_${timestamp}.xlsx`;
+
+    // Salvar arquivo Excel
+    XLSX.writeFile(workbook, fileName);
+}
+
