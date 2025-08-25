@@ -27,32 +27,36 @@ async function extractColumn() {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
 
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
             const columnArray = [];
 
-            //Alterado essa parte para garantir que a busca seja feita por "Giramille", caso nao seja nformado pelo usuario.
-            if (jsonData.length > 0) {
-                for (const row of jsonData) {
-                    if (row.length >= 1 && row[0]) {  // Verifica apenas se row[0] existe
-                        const url = String(row[0]).trim();
-                        // Usa row[1] se existir e não for vazio, caso contrário usa "Giramille"
-                        const term = (row.length >= 2 && row[1]) ? String(row[1]).trim() : "Giramille";
-                        
-                        if (url) {  // Agora só precisa verificar a URL
-                            columnArray.push({ url, term });
+            // Loop por todas as worksheets
+            for (let i = 0; i < workbook.SheetNames.length; i++) {
+                const sheetName = workbook.SheetNames[i];
+                const worksheet = workbook.Sheets[sheetName];
+
+                statusElement.innerText = `[JS] Lendo worksheet ${i + 1} de ${workbook.SheetNames.length}: "${sheetName}"...`;
+
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                if (jsonData.length > 0) {
+                    for (const row of jsonData) {
+                        if (row.length >= 1 && row[0]) {
+                            const url = String(row[0]).trim();
+                            const term = (row.length >= 2 && row[1]) ? String(row[1]).trim() : "Giramille";
+                            const sheet = "Sheet - " + (i + 1);
+                            if (url) {
+                                columnArray.push({ url, term, sheet });
+                            }
                         }
                     }
                 }
+            }
 
+            if (columnArray.length > 0) {
                 columnArrayLength = columnArray.length;
                 outputElement.innerText = JSON.stringify(columnArray, null, 2);
 
-                // Reset table and UI
-                document.getElementById('resultsBody').innerHTML = '';
+                //document.getElementById('resultsBody').innerHTML = '';
                 document.getElementById('resultsTable').style.display = 'none';
                 progressText.innerText = `Preparando para processar ${columnArray.length} sites...`;
 
@@ -83,8 +87,9 @@ async function extractColumn() {
                 }
             } else {
                 statusElement.className = "error";
-                statusElement.innerText = "Arquivo Excel vazio ou sem dados.";
+                statusElement.innerText = "Nenhuma URL encontrada em nenhuma worksheet.";
             }
+
         } catch (error) {
             statusElement.className = "error";
             statusElement.innerText = "Erro ao processar o arquivo: " + error.message;
@@ -114,8 +119,17 @@ async function checkProgress() {
         updateResultsTable(data.results);
 
         const processedCount = data.results.filter(r => r.status_search_bar !== "Processando...").length;
+        const numberOfLoops = data.results[0].number_of_loops;
+
         document.getElementById('progressText').innerText = 
-            `${processedCount} de ${columnArrayLength} sites processados`;
+            `${processedCount} de ${columnArrayLength} sites processados - Loop numero: ${numberOfLoops}`;
+
+        // Pegar o número do loop (vem igual para todos os resultados, então basta pegar do primeiro)
+        if (data.results.length > 0) {
+            const numberOfLoops = data.results[0].number_of_loops;
+            document.getElementById('loopCounter').innerText = 
+                `Loop número: ${numberOfLoops}`;
+        }
 
         if (data.complete) {
             clearInterval(pollingInterval);
@@ -159,7 +173,12 @@ function updateResultsTable(results) {
 
         const urlCell = document.createElement('td');
         urlCell.textContent = result.url;
+
+        const worksheetNumber = document.createElement('td');
+        worksheetNumber.textContent = result.worksheetNumber;
+
         row.appendChild(urlCell);
+        row.appendChild(worksheetNumber);
 
         const statusFindSearchBar = document.createElement('td');
         statusFindSearchBar.textContent = result.status_search_bar;
@@ -169,7 +188,7 @@ function updateResultsTable(results) {
         else if (result.status_search_bar.startsWith("Timeout")) statusFindSearchBar.className = "warning";
         else if (result.status_search_bar.startsWith("Erro")) statusFindSearchBar.className = "error";
         else if (result.status_search_bar === "Processando...") statusFindSearchBar.className = "processing";
-
+        
         row.appendChild(statusFindSearchBar);
 
         const statusFindSearchTerm = document.createElement('td');

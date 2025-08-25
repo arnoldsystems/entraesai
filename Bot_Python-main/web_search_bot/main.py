@@ -29,120 +29,106 @@ processing_complete = False
 processing_error = None
 
 def process_sites(sites):
-    global current_results, processing_complete, processing_error
-    
-    # Reiniciar variáveis globais
-    current_results = []
-    processing_complete = False
-    processing_error = None
-    
-    total_sites = len(sites)
-    
-    try:
-        with sync_playwright() as playwright:
-            # Iniciar o navegador com configurações específicas
-            browser = playwright.chromium.launch(
-                headless=False,  # Navegador visível
-                slow_mo=300,     # Desacelerar para visualização
-                args=['--start-maximized'
-                      '--disable-notifications',  # Bloqueia popups de notificação
-                      '--disable-infobars']      # Remove barras de aviso]  # Iniciar maximizado
-            )
-            
-            print(f"Navegador iniciado, processando {total_sites} sites...")
-            
-            for i in range(total_sites):
-                site_data = sites[i]
-                site_url = site_data.get("url", "")
-                search_term = site_data.get("term", "Giramille")  # default "Giramille" if não tiver
+    global current_results, processing_complete, processing_error, number_of_loops
+    number_of_loops = 0
 
-                current_index = i + 1
-                result = {
-                    "url": site_url, 
-                    "status": "Processando...", 
-                    "status_search_bar": "Processando...",
-                    "status_content_search": "Processando...",  
-                    "progress": f"({current_index} de {total_sites})"
-                }
-                
-                # Adicionar ao array de resultados para atualização em tempo real
-                current_results.append(result)
-                
-                try:
-                    # Criar uma nova página para cada site
-                    page = browser.new_page()
-                    
-                    # Configurar timeout para navegação
-                    page.set_default_timeout(SITE_PROCESSING_TIMEOUT * 1000)
-                    start_time = time.time()
-                    
-                    # Navegação e processamento
-                    #print(f"Processando site {current_index}/{total_sites}: {site_url}")
-                    
-                    # Ir para DuckDuckGo
-                    page.goto('https://duckduckgo.com', wait_until="load")
-                                        
-                    # Preencher e submeter a busca
-                    page.click('#searchbox_input')
-                    
-                    page.fill('#searchbox_input', site_url)
-                    
-                    page.press('#searchbox_input', 'Enter')
-                                                            
-                    check_timeout(start_time, SITE_PROCESSING_TIMEOUT)
-                        
-                    # Esperar que os resultados da busca carreguem
-                    page.wait_for_selector('h2', state='visible')
-                    page.click('h2')
-                    page.wait_for_load_state("load")
-                                        
-                    check_timeout(start_time, SITE_PROCESSING_TIMEOUT)
-                    
-                    # Tenta fazer a busca por "Giramille" na página
-                    search_field_founded, search_success = search_and_scroll(page, search_term)
+    while True:  # 🔄 Loop infinito
+        number_of_loops += 1
+        # Reiniciar variáveis globais a cada ciclo
+        current_results = []
+        processing_complete = False
+        processing_error = None
 
-                    if not search_field_founded:
-                        # Caso não tenha achado campo de busca
-                        result["status_search_bar"] = "Campo de busca não encontrado"
-                        result["status_content_search"] = "Não foi possível realizar a busca"
-                    else:
-                        # Achou campo de busca
-                        result["status_search_bar"] = "Campo de busca encontrado"
-                        if search_success:
-                            result["status_content_search"] = "Termo encontrado"
+        total_sites = len(sites)
+
+        try:
+            with sync_playwright() as playwright:
+                # Iniciar o navegador com configurações específicas
+                browser = playwright.chromium.launch(
+                    headless=False,
+                    slow_mo=300,
+                    args=['--start-maximized',
+                          '--disable-notifications',
+                          '--disable-infobars']
+                )
+
+                print(f"Navegador iniciado, processando {total_sites} sites...")
+
+                for i in range(total_sites):
+                    site_data = sites[i]
+                    site_url = site_data.get("url", "")
+                    search_term = site_data.get("term", "Giramille")
+
+                    current_index = i + 1
+                    result = {
+                        "url": site_url,
+                        "worksheetNumber": number_of_loops,
+                        "status": "Processando...",
+                        "status_search_bar": "Processando...",
+                        "status_content_search": "Processando...",
+                        "progress": f"({current_index} de {total_sites})",
+                        "number_of_loops": number_of_loops
+                    }
+
+                    current_results.append(result)
+
+                    try:
+                        page = browser.new_page()
+                        page.set_default_timeout(SITE_PROCESSING_TIMEOUT * 1000)
+                        start_time = time.time()
+
+                        # Ir para DuckDuckGo
+                        page.goto('https://duckduckgo.com', wait_until="load")
+                        page.click('#searchbox_input')
+                        page.fill('#searchbox_input', site_url)
+                        page.press('#searchbox_input', 'Enter')
+
+                        check_timeout(start_time, SITE_PROCESSING_TIMEOUT)
+
+                        page.wait_for_selector('h2', state='visible')
+                        page.click('h2')
+                        page.wait_for_load_state("load")
+
+                        check_timeout(start_time, SITE_PROCESSING_TIMEOUT)
+
+                        # Busca na página
+                        search_field_founded, search_success = search_and_scroll(page, search_term)
+
+                        if not search_field_founded:
+                            result["status_search_bar"] = "Campo de busca não encontrado"
+                            result["status_content_search"] = "Não foi possível realizar a busca"
                         else:
-                            result["status_content_search"] = "Termo não encontrado"
+                            result["status_search_bar"] = "Campo de busca encontrado"
+                            result["status_content_search"] = "Termo encontrado" if search_success else "Termo não encontrado"
 
+                    except TimeoutError as e:
+                        result["status"] = f"Timeout: {str(e)}"
+                        result["status_search_bar"] = f"Timeout: {str(e)}"
+                        result["status_content_search"] = "-"
+                        print(f"Timeout: {str(e)}")
 
-                except TimeoutError as e:
-                    result["status"] = f"Timeout: {str(e)}"
-                    result["status_search_bar"] = f"Timeout: {str(e)}"
-                    result["status_content_search"] = "-"
+                    except Exception as e:
+                        result["status"] = f"Erro: {str(e)}"
+                        result["status_search_bar"] = f"Erro: {str(e)}"
+                        result["status_content_search"] = "-"
+                        print(f"Erro: {str(e)}")
 
-                    print(f"Timeout: {str(e)}")
-                except Exception as e:
-                    result["status"] = f"Erro: {str(e)}"
-                    result["status_search_bar"] = f"Erro: {str(e)}"
-                    result["status_content_search"] = "-"
-                    print(f"Erro: {str(e)}")
-                    
-                finally:
-                    # Atualizar o resultado atual
-                    current_results[i] = result
-                    
-                    # Fechar a página
-                    if 'page' in locals() and not page.is_closed():
-                        page.close()
+                    finally:
+                        current_results[i] = result
+                        if 'page' in locals() and not page.is_closed():
+                            page.close()
 
-            browser.close()
-            print("Navegador fechado, processamento concluído")
-            
-    except Exception as e:
-        processing_error = str(e)
-        print(f"Erro global: {str(e)}")
-    
-    # Marcar o processamento como concluído
-    processing_complete = True
+                browser.close()
+                print("Navegador fechado, processamento concluído")
+
+        except Exception as e:
+            processing_error = str(e)
+            print(f"Erro global: {str(e)}")
+
+        processing_complete = True
+
+        # 🔄 Recomeça imediatamente
+        print("Reiniciando processamento...")
 
 
 @app.route('/process-column', methods=['POST'])
@@ -150,8 +136,7 @@ def process_column():
     print("1. process column")
     try:
         # Receber os dados JSON enviados pelo frontend
-        data = request.json
-        print(data)
+        data = request.json        
         if not data or 'columnData' not in data:
             return jsonify({'error': 'Dados ausentes ou formato inválido'}), 400
         
